@@ -38,7 +38,7 @@ Simple, cepat, dan pastinya bikin hidup lebih mudah. Kami bikin X-Fusion buat ka
 
 1. [**Pengenalan**](docs/Introduction.md)
 2. [**Instalasi & Konfigurasi**](docs/Installation.md)
-3. [**Routing**](docs/Route.md)
+3. [**Routing**](docs/route.md)
 4. [**Middleware**](docs/Middleware.md)
 5. [**Caching**](docs/Caching.md)
 6. [**Error Handling**](docs/ErrorHandling.md)

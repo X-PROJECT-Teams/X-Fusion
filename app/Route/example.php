@@ -77,3 +77,4 @@ Route::get("/naming/{id}", function ($id) {
 Route::get("/test/number/{id:[0-9]+}", function ($id) {
     echo "Hello World " . $id;
 });
+

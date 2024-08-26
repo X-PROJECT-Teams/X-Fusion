@@ -5,6 +5,7 @@ namespace XProject\XFusion\App\Core;
 use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
 use XProject\XFusion\App\Core\Handler\ErrorHandler;
+use XProject\XFusion\App\Exceptions\RouteConstraintException;
 use \XProject\XFusion\App\Http\Request;
 use XProject\XFusion\App\Core\Contracts\RouterInterface;
 use XProject\XFusion\App\Http\Response;
@@ -31,6 +32,9 @@ class Router implements RouterInterface
         Route::setRoutes($method, $route, $controller, $middleware);
     }
 
+    /**
+     * @throws RouteConstraintException
+     */
     public function dispatch(string $httpMethod, string $uri): void
     {
         // Strip query string (?foo=bar) and decode URI
@@ -42,37 +46,13 @@ class Router implements RouterInterface
         $routeInfo = $this->dispatcher->dispatch($httpMethod, $uri);
         switch($routeInfo[0]) {
             case Dispatcher::NOT_FOUND:
-                // handle 404
-                $missingCallback = $this->findMissingCallback($httpMethod, $uri);
-                if ($missingCallback) {
-                    $request = new Request($_REQUEST);
-                    call_user_func_array($missingCallback, (array) $request);
-                } else {
-                    header("HTTP/1.0 404 Not Found");
-                    echo json_encode(['error' => '404 Not Found']);
-                }
-
+                $this->handleNotFound($httpMethod, $uri);
                 break;
             case Dispatcher::METHOD_NOT_ALLOWED:
-                $allowedMethods = $routeInfo[1];
-                header("HTTP/1.0 405 Method Not Allowed");
-                echo json_encode(['error' => '405 Method Not Allowed']);
+                $this->handleMethodNotAllowed($routeInfo[1]);
                 break;
             case Dispatcher::FOUND:
-                $handler = $routeInfo[1];
-                $vars = $routeInfo[2];
-
-                if (is_callable($handler)) {
-                    call_user_func_array($handler, $vars);
-                } else {
-                    [$class, $method] = $handler;
-
-                    if (class_exists($class) && method_exists($class, $method)) {
-                        $classInstance = new $class;
-                        $this->applyMiddleware($classInstance, $vars, $routeInfo);
-                        call_user_func_array([$classInstance, $method], $vars);
-                    }
-                }
+               $this->handleFound($routeInfo, $uri);
                 break;
         }
     }
@@ -117,5 +97,58 @@ class Router implements RouterInterface
             }
         }
         return null;
+    }
+    private function handleNotFound(string $httpMethod, string $uri): void
+    {
+        $missingCallback  = $this->findMissingCallback($httpMethod, $uri);
+        if ($missingCallback) {
+            $request = new Request($_REQUEST);
+            call_user_func_array($missingCallback, (array) $request);
+        } else {
+            header("HTTP/1.0 404 Not Found");
+            echo json_encode(['error' => '404 Not Found']);
+        }
+    }
+    private function handleMethodNotAllowed(array $allowedMethods): void
+    {
+        header("HTTP/1.0 405 Method Not Allowed");
+        echo json_encode(['error' => '405 Method Not Allowed']);
+    }
+    private function handleFound(array $routeInfo, string $uri): void
+    {
+        $handler = $routeInfo[1];
+        $vars = $routeInfo[2];
+
+        if (!$this->checkConstraints($uri, $vars)) {
+            throw new RouteConstraintException("Route constraint failed");
+        }
+
+        if (is_callable($handler)) {
+            call_user_func_array($handler, $vars);
+        } else {
+            [$class, $method] = $handler;
+
+            if (class_exists($class) && method_exists($class, $method)) {
+                $classInstance = new $class;
+                $this->applyMiddleware($classInstance, $vars, $routeInfo);
+                call_user_func_array([$classInstance, $method], $vars);
+
+            }
+        }
+    }
+    private function checkConstraints(string $uri, array $vars): bool
+    {
+        $constraints = Route::getConstraints();
+
+        foreach($constraints as $route => $constraint) {
+            if (preg_match("#^$route$#", $uri)) {
+                foreach ($constraints as $var => $pattern) {
+                    if (!preg_match($pattern, $vars[$var] ?? '')) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
     }
 }

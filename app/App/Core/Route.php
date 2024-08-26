@@ -8,10 +8,22 @@ use XProject\XFusion\App\Cache\RouterCache;
 class Route
 {
     private static array $routes = [];
+    private static array $constraints = [];
     private static ?string $prefix = null;
     private static ?string $controller = null;
     private static array $middleware = [];
     private static  $missingCallback = null;
+
+    public static function where (string $constraints): self
+    {
+        $lastRoute = &self::$routes[count(self::$routes) - 1];
+        self::$constraints[$lastRoute['route']] = $constraints;
+        return new self;
+    }
+    public static function getConstraints(): array {
+        return self::$constraints;
+    }
+
     public static function get(string $route, $controller, array $middleware = []): self
     {
         return self::setRoutes('GET', $route, $controller, $middleware);
