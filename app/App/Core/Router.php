@@ -2,10 +2,16 @@
 
 namespace XProject\XFusion\App\Core;
 
+use DI\DependencyException;
+use DI\NotFoundException;
 use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
+use Psr\Container\ContainerExceptionInterface;
+use Psr\Container\ContainerInterface;
 use XProject\XFusion\App\Core\Handler\ErrorHandler;
+use XProject\XFusion\App\Core\Traits\SingletonTrait;
 use XProject\XFusion\App\Exceptions\RouteConstraintException;
+use XProject\XFusion\App\Facades\App;
 use \XProject\XFusion\App\Http\Request;
 use XProject\XFusion\App\Core\Contracts\RouterInterface;
 use XProject\XFusion\App\Http\Response;
@@ -15,10 +21,11 @@ use function FastRoute\simpleDispatcher;
 class Router implements RouterInterface
 {
     protected $dispatcher;
+    protected $container;
 
-    public function __construct(array $routes)
+    public function __construct(array $routes, ContainerInterface $container)
     {
-
+        $this->container = $container;
 
         $this->dispatcher = simpleDispatcher(function (RouteCollector $r) use ($routes) {
             foreach ($routes as $route) {
@@ -30,6 +37,21 @@ class Router implements RouterInterface
     public function addRoute(string $method, string $route, array $controller, array $middleware = []): void
     {
         Route::setRoutes($method, $route, $controller, $middleware);
+    }
+
+    /**
+     * @throws DependencyException
+     * @throws NotFoundException
+     * @throws ContainerExceptionInterface
+     */
+    public function resolveController(string $controller)
+    {
+        $controllerInstance = $this->container->get($controller);
+        if (method_exists($controllerInstance, 'setContainer')) {
+            $controllerInstance->setContainer($this->container);
+        }
+
+        return $controllerInstance;
     }
 
     /**
@@ -82,6 +104,9 @@ class Router implements RouterInterface
         $next($request);
     }
 
+    /**
+     * @throws RouteConstraintException
+     */
     public function handleRequest(Request $request): void
     {
         $httpMethod = $request->getMethod();
@@ -114,6 +139,12 @@ class Router implements RouterInterface
         header("HTTP/1.0 405 Method Not Allowed");
         echo json_encode(['error' => '405 Method Not Allowed']);
     }
+
+    /**
+     * @throws RouteConstraintException
+     * @throws DependencyException
+     * @throws NotFoundException
+     */
     private function handleFound(array $routeInfo, string $uri): void
     {
         $handler = $routeInfo[1];
@@ -129,10 +160,8 @@ class Router implements RouterInterface
             [$class, $method] = $handler;
 
             if (class_exists($class) && method_exists($class, $method)) {
-                $classInstance = new $class;
+                $classInstance = $this->resolveController($class);
                 $this->applyMiddleware($classInstance, $vars, $routeInfo);
-                call_user_func_array([$classInstance, $method], $vars);
-
             }
         }
     }

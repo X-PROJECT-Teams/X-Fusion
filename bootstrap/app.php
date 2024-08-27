@@ -7,7 +7,9 @@ use XProject\XFusion\App\Core\Handler\ErrorHandler;
 use \XProject\XFusion\App\Core\Config\Config;
 use \XProject\XFusion\App\Cache\RouterCache;
 use \Dotenv\Dotenv;
-
+use XProject\XFusion\App\Facades\App;
+use \XProject\XFusion\App\Core\Container;
+use XProject\XFusion\TodoList\Service\CounterService;
 
 // Register Error Handler
 ErrorHandler::register();
@@ -21,6 +23,22 @@ $dotenv->required([
 ])->notEmpty();
 
 Config::loadFromDirectory(__DIR__ . "/../app/App/Config");
+
+$containerBuilder = new \DI\ContainerBuilder();
+$containerBuilder->useAutowiring(true);
+
+
+
+
+try {
+    $container = $containerBuilder->build();
+} catch (Exception $e) {
+    echo $e->getMessage();
+    exit();
+}
+
+App::setContainer($container);
+
 
 if (!RouterCache::loadCachedRoutes()) {
     require __DIR__ . "/../app/Route/web.php";

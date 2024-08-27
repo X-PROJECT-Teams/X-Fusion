@@ -78,3 +78,11 @@ Route::get("/test/number/{id:[0-9]+}", function ($id) {
     echo "Hello World " . $id;
 });
 
+
+Route::get('/test/depedency', [\XProject\XFusion\TodoList\Controller\TestController::class, 'test']);
+
+Route::get("/counter1", [\XProject\XFusion\TodoList\Controller\CounterController::class, 'index']);
+Route::get("/counter2", [\XProject\XFusion\TodoList\Controller\Counter2Controller::class, 'index']);
+
+Route::get("/view", [\XProject\XFusion\TodoList\Controller\ViewTestController::class, 'testView']);
+Route::get("/view2", [\XProject\XFusion\TodoList\Controller\ViewTestController::class, 'test']);
